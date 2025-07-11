@@ -36,7 +36,12 @@ class AuthService {
       final data = ApiService.handleResponse(response);
       return data['message'] as String;
     } catch (e) {
-      throw Exception('회원가입 실패: $e');
+      // ApiService에서 이미 한국어 메시지로 변환되므로 그대로 전달
+      String errorMessage = e.toString();
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11); // 'Exception: ' 제거
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -59,7 +64,12 @@ class AuthService {
       
       return authResponse;
     } catch (e) {
-      throw Exception('로그인 실패: $e');
+      // ApiService에서 이미 한국어 메시지로 변환되므로 그대로 전달
+      String errorMessage = e.toString();
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11); // 'Exception: ' 제거
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -70,7 +80,11 @@ class AuthService {
       final data = ApiService.handleResponse(response);
       return User.fromJson(data['user'] as Map<String, dynamic>);
     } catch (e) {
-      throw Exception('사용자 정보 조회 실패: $e');
+      String errorMessage = e.toString();
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -111,7 +125,11 @@ class AuthService {
       
       return authResponse;
     } catch (e) {
-      throw Exception('이메일 인증 실패: $e');
+      String errorMessage = e.toString();
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+      throw Exception(errorMessage);
     }
   }
 
@@ -122,10 +140,14 @@ class AuthService {
         'email': email,
       });
 
-      final data = ApiService.handleResponse(response);
+      final data = ApiService.handleResponse(response);      
       return data['message'] as String;
     } catch (e) {
-      throw Exception('인증 이메일 재발송 실패: $e');
+      String errorMessage = e.toString();
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+      throw Exception(errorMessage);
     }
   }
 } 

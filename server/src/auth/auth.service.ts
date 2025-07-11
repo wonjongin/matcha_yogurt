@@ -101,6 +101,18 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
+    // 사용자 수 제한 확인 (출시 초기 제한)
+    const MAX_USERS = parseInt(process.env.MAX_USERS || '100'); // 환경변수로 설정 가능
+    const currentUserCount = await this.prisma.user.count({
+      where: { emailVerified: true }, // 인증된 사용자만 카운트
+    });
+
+    if (currentUserCount >= MAX_USERS) {
+      throw new BadRequestException(
+        `서비스 출시 초기로 사용자 수가 제한되어 있습니다. 현재 ${MAX_USERS}명의 사용자가 등록되어 있습니다. 곧 더 많은 사용자를 받을 예정입니다.`
+      );
+    }
+
     // 비밀번호 강도 검증
     const passwordValidation = this.validatePasswordStrength(registerDto.password);
     if (!passwordValidation.isValid) {
@@ -113,7 +125,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already exists');
+      throw new BadRequestException('이미 사용 중인 이메일입니다.');
     }
 
     // 비밀번호 해싱
@@ -161,19 +173,19 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     // 비밀번호 검증
     const isValidPassword = await this.validatePassword(loginDto.password, user.password);
 
     if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
     // 이메일 인증 확인
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Please verify your email before logging in');
+      throw new UnauthorizedException('로그인하기 전에 이메일 인증을 완료해주세요.');
     }
 
     // JWT 토큰 생성

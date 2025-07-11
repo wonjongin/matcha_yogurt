@@ -1,98 +1,197 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Matcha Yogurt Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+팀 캘린더 애플리케이션의 백엔드 서버입니다. NestJS와 Prisma를 사용하여 구축되었습니다.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 기능
 
-## Description
+- **사용자 인증**: JWT 기반 로그인/회원가입, 이메일 인증
+- **팀 관리**: 팀 생성, 멤버 초대, 권한 관리
+- **일정 관리**: 개인/팀 일정 생성, 수정, 삭제
+- **사용자 제한**: 출시 초기 사용자 수 제한 기능
+- **보안**: bcrypt 비밀번호 해싱, 강력한 비밀번호 정책
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📋 요구사항
 
-## Project setup
+- Node.js 18+
+- pnpm
+- SQLite (개발용) / PostgreSQL (프로덕션)
+
+## ⚙️ 설정
+
+### 1. 패키지 설치
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+### 2. 환경변수 설정
+
+`.env` 파일을 생성하고 다음 내용을 추가하세요:
+
+```env
+# 데이터베이스
+DATABASE_URL="file:./dev.db"
+
+# JWT 토큰
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
+
+# 이메일 설정 (개발 중에는 콘솔로 출력)
+SMTP_HOST="localhost"
+SMTP_PORT="587"
+SMTP_USER=""
+SMTP_PASS=""
+FROM_EMAIL="noreply@matcha-yogurt.com"
+
+# 사용자 수 제한 (출시 초기)
+MAX_USERS="50"  # 초기에는 50명으로 제한, 0 = 제한 없음
+
+# 서버 포트
+PORT="3000"
+```
+
+### 3. 데이터베이스 설정
 
 ```bash
-# development
-$ pnpm run start
+# Prisma 클라이언트 생성
+npx prisma generate
 
-# watch mode
-$ pnpm run start:dev
+# 데이터베이스 동기화
+npx prisma db push
 
-# production mode
-$ pnpm run start:prod
+# (선택사항) 데이터베이스 브라우저로 확인
+npx prisma studio
 ```
 
-## Run tests
+## 🏃‍♂️ 서버 실행
 
 ```bash
-# unit tests
-$ pnpm run test
+# 개발 모드 (파일 변경 감지)
+pnpm run start:dev
 
-# e2e tests
-$ pnpm run test:e2e
+# 일반 실행
+pnpm run start
 
-# test coverage
-$ pnpm run test:cov
+# 프로덕션 빌드 후 실행
+pnpm run build
+pnpm run start:prod
 ```
 
-## Deployment
+## 👥 사용자 수 제한 기능
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+출시 초기에 서비스를 안정적으로 운영하기 위해 사용자 수 제한 기능을 제공합니다.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 설정 방법
+
+1. **환경변수로 제한**: `.env` 파일에서 `MAX_USERS=50` 설정
+2. **제한 해제**: `MAX_USERS=0` 또는 변수 삭제
+3. **실시간 변경**: 서버 재시작 없이 환경변수 변경 후 적용
+
+### 작동 방식
+
+- 이메일 인증이 완료된 사용자만 카운트
+- 제한에 도달하면 새로운 회원가입 차단
+- 기존 사용자 로그인은 정상 작동
+- 친화적인 한국어 에러 메시지 제공
+
+### 사용자 수 확인
+
+현재 등록된 사용자 수를 확인하려면:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# SQLite 데이터베이스 직접 조회
+sqlite3 prisma/dev.db "SELECT COUNT(*) FROM users WHERE emailVerified = 1;"
+
+# 또는 Prisma Studio 사용
+npx prisma studio
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 🔒 보안 설정
 
-## Resources
+### 비밀번호 정책
 
-Check out a few resources that may come in handy when working with NestJS:
+- 최소 8자, 최대 128자
+- 대소문자, 숫자, 특수문자 각각 최소 1개
+- 연속된 문자/숫자 금지 (abc, 123 등)
+- 일반적인 약한 비밀번호 패턴 금지
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### JWT 설정
 
-## Support
+- 강력한 JWT_SECRET 사용 권장
+- 토큰 만료 시간: 24시간 (기본값)
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## 📧 이메일 설정
 
-## Stay in touch
+### 개발 환경
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- 이메일이 콘솔에 출력됩니다
+- SMTP 설정이 비어있어도 정상 작동
 
-## License
+### 프로덕션 환경
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```env
+SMTP_HOST="your-smtp-host.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@domain.com"
+SMTP_PASS="your-app-password"
+FROM_EMAIL="noreply@yourdomain.com"
+```
+
+## 🧪 테스트
+
+```bash
+# 단위 테스트
+pnpm run test
+
+# E2E 테스트
+pnpm run test:e2e
+
+# 테스트 커버리지
+pnpm run test:cov
+```
+
+## 📦 빌드 및 배포
+
+```bash
+# 프로덕션 빌드
+pnpm run build
+
+# 프로덕션 실행
+pnpm run start:prod
+```
+
+## 🛠️ 개발 도구
+
+- **ESLint**: 코드 품질 검사
+- **Prettier**: 코드 포맷팅
+- **Prisma Studio**: 데이터베이스 GUI
+
+## 📚 API 문서
+
+서버 실행 후 다음 주소에서 API 문서를 확인할 수 있습니다:
+- Swagger: `http://localhost:3000/api` (예정)
+
+## 🆘 문제 해결
+
+### 일반적인 문제
+
+1. **Prisma 에러**: `npx prisma generate` 재실행
+2. **포트 충돌**: `.env`에서 PORT 변경
+3. **데이터베이스 에러**: `npx prisma db push` 재실행
+
+### 로그 확인
+
+```bash
+# 개발 모드에서 자세한 로그 확인
+DEBUG=* pnpm run start:dev
+```
+
+## 🔄 업데이트
+
+```bash
+# 의존성 업데이트
+pnpm update
+
+# Prisma 스키마 변경 후
+npx prisma db push
+npx prisma generate
+```

@@ -264,7 +264,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
         ? maxEventsRaw.clamp(1, 4) // 더보기가 필요하면 더 보수적으로
         : (availableForEvents / eventHeight).floor().clamp(1, 5); // 더보기가 불필요하면 더 많이 표시
     
-    final fontSize = isMobile ? 8.0 : 9.0;
+                    final fontSize = isMobile ? 10.0 : 11.0; // 일정 제목 글씨 크기 증가
     
     return Container(
       margin: const EdgeInsets.all(1),
@@ -288,7 +288,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
               child: Text(
                 '${day.day}',
                 style: TextStyle(
-                  fontSize: isMobile ? 12 : 14, // 줄임
+                  fontSize: isMobile ? 14 : 16, // 날짜 글씨 크기 증가
                   fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? Theme.of(context).colorScheme.onPrimaryContainer

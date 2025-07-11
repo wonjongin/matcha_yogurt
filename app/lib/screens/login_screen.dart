@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/team_service.dart';
 import '../services/event_service.dart';
 import '../providers/calendar_providers.dart';
+import '../utils/error_utils.dart';
 import 'calendar_screen.dart';
 import 'email_verification_screen.dart';
 
@@ -88,12 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       // 에러 처리
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isLogin ? '로그인 실패: $e' : '회원가입 실패: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorUtils.showErrorSnackBar(context, e);
       }
     } finally {
       if (mounted) {

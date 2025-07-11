@@ -428,7 +428,7 @@ class _WeekViewState extends ConsumerState<WeekView> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
-                      fontSize: 10,
+                      fontSize: 11, // 일정 제목 글씨 크기 증가
                     ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -465,7 +465,7 @@ class _WeekViewState extends ConsumerState<WeekView> {
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 10,
+                fontSize: 11, // 하루종일 이벤트 제목 글씨 크기 증가
               ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
