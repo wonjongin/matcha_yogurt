@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum EventType {
+  MEETING
+  DEADLINE
+  REMINDER
+  CELEBRATION
+  OTHER
+}
+
+// Models
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  password        String   // 해시된 비밀번호
+  profileImageUrl String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  ownedTeams   Team[]       @relation("TeamOwner")
+  teamMembers  TeamMember[]
+  events       Event[]
+
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  color       String   // Hex color string
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner   User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members TeamMember[]
+  events  Event[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Unique constraint - user can only be in a team once
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @default("")
+  startTime   DateTime
+  endTime     DateTime
+  isAllDay    Boolean   @default(false)
+  teamId      String?
+  color       String?   // Hex color string
+  eventType   EventType @default(OTHER)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@map("events")
+}
