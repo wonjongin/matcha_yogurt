@@ -48,9 +48,9 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
+      id: json['id'] as String?,
+      name: (json['name'] as String?) ?? '',
+      email: (json['email'] as String?) ?? '',
       profileImageUrl: json['profileImageUrl'] as String?,
       createdAt: json['createdAt'] != null 
           ? DateTime.parse(json['createdAt'] as String)

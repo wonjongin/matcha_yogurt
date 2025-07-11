@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/team_service.dart';
+import '../services/event_service.dart';
 import '../providers/calendar_providers.dart';
 import 'calendar_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -39,36 +41,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      late AuthResponse response;
-      
       if (_isLogin) {
         // 로그인
-        response = await AuthService.login(
+        final response = await AuthService.login(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+
+        // 현재 사용자 정보를 상태에 저장
+        ref.read(currentUserProvider.notifier).state = response.user;
+
+        // 사용자의 팀 데이터 동기화
+        await _syncUserTeamData(response.user.id);
+        
+        // 사용자의 일정 데이터 로드
+        await _loadUserEvents(response.user.id);
+
+        // 성공 시 메인 화면으로 이동
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const CalendarScreen(),
+            ),
+          );
+        }
       } else {
         // 회원가입
-        response = await AuthService.register(
+        final message = await AuthService.register(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-      }
 
-      // 현재 사용자 정보를 상태에 저장
-      ref.read(currentUserProvider.notifier).state = response.user;
-
-      // 사용자의 팀 데이터 동기화
-      await _syncUserTeamData(response.user.id);
-
-      // 성공 시 메인 화면으로 이동
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const CalendarScreen(),
-          ),
-        );
+        // 성공 시 이메일 인증 화면으로 이동
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => EmailVerificationScreen(
+                email: _emailController.text.trim(),
+                name: _nameController.text.trim(),
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       // 에러 처리
@@ -129,6 +144,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       print('팀 데이터 동기화 실패: $e');
       // 동기화 실패해도 로그인은 성공으로 처리
+    }
+  }
+
+  Future<void> _loadUserEvents(String userId) async {
+    try {
+      // 서버에서 사용자의 일정 데이터 가져오기
+      final events = await EventService.getUserEvents(userId: userId);
+      
+      // 로컬 상태에 일정 데이터 설정
+      final eventsNotifier = ref.read(eventsProvider.notifier);
+      eventsNotifier.state = events;
+      
+      print('로그인 후 일정 데이터 로드 완료: ${events.length}개');
+    } catch (e) {
+      print('일정 데이터 로드 실패: $e');
+      // 일정 로드 실패해도 로그인은 성공으로 처리
     }
   }
 

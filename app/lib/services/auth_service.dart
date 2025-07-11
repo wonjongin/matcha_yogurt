@@ -20,8 +20,8 @@ class AuthResponse {
 }
 
 class AuthService {
-  // 회원가입
-  static Future<AuthResponse> register({
+  // 회원가입 (이메일 인증 필요)
+  static Future<String> register({
     required String name,
     required String email,
     required String password,
@@ -34,12 +34,7 @@ class AuthService {
       });
 
       final data = ApiService.handleResponse(response);
-      final authResponse = AuthResponse.fromJson(data);
-      
-      // JWT 토큰 저장
-      await ApiService.saveToken(authResponse.accessToken);
-      
-      return authResponse;
+      return data['message'] as String;
     } catch (e) {
       throw Exception('회원가입 실패: $e');
     }
@@ -99,5 +94,38 @@ class AuthService {
   static Future<bool> hasToken() async {
     final token = await ApiService.getToken();
     return token != null;
+  }
+
+  // 이메일 인증
+  static Future<AuthResponse> verifyEmail(String token) async {
+    try {
+      final response = await ApiService.post('/auth/verify-email', {
+        'token': token,
+      });
+
+      final data = ApiService.handleResponse(response);
+      final authResponse = AuthResponse.fromJson(data);
+      
+      // JWT 토큰 저장
+      await ApiService.saveToken(authResponse.accessToken);
+      
+      return authResponse;
+    } catch (e) {
+      throw Exception('이메일 인증 실패: $e');
+    }
+  }
+
+  // 인증 이메일 재발송
+  static Future<String> resendVerificationEmail(String email) async {
+    try {
+      final response = await ApiService.post('/auth/resend-verification', {
+        'email': email,
+      });
+
+      final data = ApiService.handleResponse(response);
+      return data['message'] as String;
+    } catch (e) {
+      throw Exception('인증 이메일 재발송 실패: $e');
+    }
   }
 } 

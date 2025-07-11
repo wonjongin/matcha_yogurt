@@ -18,8 +18,19 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Post()
-  async create(@Body() createEventDto: Prisma.EventCreateInput) {
-    return this.eventsService.create(createEventDto);
+  async create(@Body() createEventDto: any) {
+    // 날짜 필드를 Date 객체로 변환
+    const processedDto: Prisma.EventCreateInput = { ...createEventDto };
+    
+    if (createEventDto.startTime) {
+      processedDto.startTime = new Date(createEventDto.startTime);
+    }
+    
+    if (createEventDto.endTime) {
+      processedDto.endTime = new Date(createEventDto.endTime);
+    }
+
+    return this.eventsService.create(processedDto);
   }
 
   @Get()
@@ -136,10 +147,21 @@ export class EventsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateEventDto: Prisma.EventUpdateInput,
+    @Body() updateEventDto: any,
   ) {
     try {
-      return await this.eventsService.update(id, updateEventDto);
+      // 날짜 필드를 Date 객체로 변환
+      const processedDto: Prisma.EventUpdateInput = { ...updateEventDto };
+      
+      if (updateEventDto.startTime) {
+        processedDto.startTime = new Date(updateEventDto.startTime);
+      }
+      
+      if (updateEventDto.endTime) {
+        processedDto.endTime = new Date(updateEventDto.endTime);
+      }
+
+      return await this.eventsService.update(id, processedDto);
     } catch (error) {
       if (error.code === 'P2025') {
         throw new HttpException('Event not found', HttpStatus.NOT_FOUND);

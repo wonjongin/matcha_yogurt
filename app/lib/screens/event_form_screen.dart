@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../providers/calendar_providers.dart';
 import '../providers/event_form_providers.dart';
+import 'team_form_screen.dart';
+import 'invitations_screen.dart';
 
 class EventFormScreen extends ConsumerStatefulWidget {
   final Event? existingEvent;
@@ -52,8 +54,28 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   Widget build(BuildContext context) {
     final formState = ref.watch(eventFormProvider);
     final formNotifier = ref.read(eventFormProvider.notifier);
-    final teams = ref.watch(teamsProvider);
     final currentUser = ref.watch(currentUserProvider);
+    
+    // 현재 사용자가 속한 팀만 가져오기
+    final userTeams = currentUser != null 
+        ? ref.watch(userTeamsProvider(currentUser.id))
+        : <Team>[];
+
+    // 현재 선택된 팀ID가 사용자 팀 리스트에 없으면 초기화
+    final currentTeamId = formState.teamId;
+    final isValidTeamId = userTeams.any((team) => team.id == currentTeamId);
+    
+    if (currentTeamId != null && !isValidTeamId && userTeams.isNotEmpty) {
+      // 유효하지 않은 팀ID인 경우 첫 번째 팀으로 설정
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        formNotifier.updateTeamId(userTeams.first.id);
+      });
+    } else if (currentTeamId != null && userTeams.isEmpty) {
+      // 팀이 없는 경우 teamId 초기화 (null로 설정)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        formNotifier.clearTeamId();
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -122,16 +144,16 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Team selection
-            if (teams.isNotEmpty)
+            // Team selection or team creation guide
+            if (userTeams.isNotEmpty)
               DropdownButtonFormField<String>(
-                value: formState.teamId,
+                value: isValidTeamId ? formState.teamId : null,
                 decoration: const InputDecoration(
                   labelText: '팀 선택 *',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.group),
                 ),
-                items: teams.map((team) {
+                items: userTeams.map((team) {
                   return DropdownMenuItem(
                     value: team.id,
                     child: Row(
@@ -154,11 +176,77 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                   if (value == null || value.isEmpty) {
                     return '팀을 선택해주세요';
                   }
+                  // 선택된 팀이 실제 사용자 팀 목록에 있는지 확인
+                  final isValidTeam = userTeams.any((team) => team.id == value);
+                  if (!isValidTeam) {
+                    return '유효하지 않은 팀입니다';
+                  }
                   return null;
                 },
                 onChanged: (teamId) {
                   if (teamId != null) formNotifier.updateTeamId(teamId);
                 },
+              )
+            else
+              // No teams - guide to create a team
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.group_add,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '팀이 없습니다',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '일정을 생성하려면 먼저 팀을 만들어야 합니다.\n팀을 만들거나 기존 팀에 초대받아 보세요.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _navigateToTeamCreation(),
+                            icon: const Icon(Icons.add),
+                            label: const Text('팀 만들기'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () => _navigateToInvitations(),
+                            icon: const Icon(Icons.mail),
+                            label: const Text('초대 확인'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             const SizedBox(height: 16),
 
@@ -221,7 +309,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     );
   }
 
-  void _saveEvent() {
+  Future<void> _saveEvent() async {
     if (_formKey.currentState!.validate()) {
       final formState = ref.read(eventFormProvider);
       final currentUser = ref.read(currentUserProvider);
@@ -229,6 +317,14 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       if (currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('사용자 정보를 찾을 수 없습니다')),
+        );
+        return;
+      }
+
+      // teamId 유효성 검사
+      if (formState.teamId == null || formState.teamId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('팀을 선택해주세요')),
         );
         return;
       }
@@ -246,19 +342,36 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
         isAllDay: formState.isAllDay,
       );
 
-      if (widget.existingEvent != null) {
-        ref.read(eventsProvider.notifier).updateEvent(event);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('일정이 수정되었습니다')),
-        );
-      } else {
-        ref.read(eventsProvider.notifier).addEvent(event);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('일정이 생성되었습니다')),
-        );
-      }
+      try {
+        if (widget.existingEvent != null) {
+          await ref.read(eventsProvider.notifier).updateEvent(event);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('일정이 수정되었습니다')),
+            );
+          }
+        } else {
+          await ref.read(eventsProvider.notifier).addEvent(event, currentUser.id);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('일정이 생성되었습니다')),
+            );
+          }
+        }
 
-      Navigator.of(context).pop();
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -286,6 +399,22 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             child: const Text('삭제'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _navigateToTeamCreation() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TeamFormScreen(),
+      ),
+    );
+  }
+
+  void _navigateToInvitations() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const InvitationsScreen(),
       ),
     );
   }

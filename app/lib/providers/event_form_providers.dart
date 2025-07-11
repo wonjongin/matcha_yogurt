@@ -31,6 +31,7 @@ class EventFormState {
     DateTime? startTime,
     DateTime? endTime,
     String? teamId,
+    bool clearTeamId = false,
     EventType? type,
     Color? color,
     bool? isAllDay,
@@ -40,7 +41,7 @@ class EventFormState {
       description: description ?? this.description,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
-      teamId: teamId ?? this.teamId,
+      teamId: clearTeamId ? null : (teamId ?? this.teamId),
       type: type ?? this.type,
       color: color ?? this.color,
       isAllDay: isAllDay ?? this.isAllDay,
@@ -116,6 +117,10 @@ class EventFormNotifier extends StateNotifier<EventFormState> {
 
   void updateTeamId(String teamId) {
     state = state.copyWith(teamId: teamId);
+  }
+
+  void clearTeamId() {
+    state = state.copyWith(clearTeamId: true);
   }
 
   void updateType(EventType type) {

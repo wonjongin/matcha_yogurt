@@ -10,6 +10,7 @@ import '../widgets/month_view.dart';
 import '../widgets/google_style_three_day_view.dart';
 import '../widgets/week_view.dart';
 import '../services/auth_service.dart';
+import '../services/event_service.dart';
 import 'login_screen.dart';
 import 'team_management_screen.dart';
 import 'invitations_screen.dart';
@@ -27,6 +28,62 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   // 플랫폼 구분: 768px 기준으로 모바일 vs 데스크톱+태블릿
   bool get isMobile => MediaQuery.of(context).size.width < 768;
+
+  @override
+  void initState() {
+    super.initState();
+    // 앱 시작 시 일정 데이터 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserEventsIfLoggedIn();
+    });
+  }
+
+  Future<void> _loadUserEventsIfLoggedIn() async {
+    final currentUser = ref.read(currentUserProvider);
+    print('DEBUG: CalendarScreen initState - currentUser = $currentUser');
+    
+    if (currentUser != null) {
+      print('DEBUG: 사용자 발견, 일정 로드 시도 중... userId = ${currentUser.id}');
+      await _loadEventsForUser(currentUser.id);
+    } else {
+      print('DEBUG: currentUser가 null입니다. 로그인 상태를 확인하세요.');
+      
+      // 개발 환경에서 임시 해결책: 마지막으로 로그인한 사용자의 일정을 로드
+      // TODO: 실제 앱에서는 저장된 인증 토큰으로 사용자 정보를 복원해야 함
+      print('DEBUG: 개발 환경 - 마지막 사용자 정보로 일정 로드 시도');
+      try {
+        // 서버에서 모든 일정을 가져와서 첫 번째 사용자의 일정을 로드
+        final allEvents = await EventService.getEvents();
+        if (allEvents.isNotEmpty) {
+          final firstEventUserId = allEvents.first.createdBy;
+          print('DEBUG: 발견된 사용자 ID: $firstEventUserId');
+          await _loadEventsForUser(firstEventUserId);
+        }
+      } catch (e) {
+        print('DEBUG: 임시 일정 로드도 실패: $e');
+      }
+    }
+  }
+
+  Future<void> _loadEventsForUser(String userId) async {
+    try {
+      // 서버에서 사용자의 일정 데이터 가져오기
+      final events = await EventService.getUserEvents(userId: userId);
+      
+      print('DEBUG: 서버에서 받은 일정 수: ${events.length}개');
+      for (final event in events) {
+        print('DEBUG: 일정 - ${event.title} (${event.startTime})');
+      }
+      
+      // 로컬 상태에 일정 데이터 설정
+      final eventsNotifier = ref.read(eventsProvider.notifier);
+      eventsNotifier.state = events;
+      
+      print('일정 데이터 로드 완료: ${events.length}개');
+    } catch (e) {
+      print('일정 데이터 로드 실패: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

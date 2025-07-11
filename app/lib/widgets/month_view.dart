@@ -251,9 +251,18 @@ class _MonthViewState extends ConsumerState<MonthView> {
     
     // 날짜 숫자 높이와 여백을 제외한 공간으로 표시 가능한 이벤트 수 계산
     final dateHeight = isMobile ? 18 : 20;
-    final availableForEvents = rowHeight - dateHeight - 6; // 여백
-    final eventHeight = isMobile ? 14 : 16; // 이벤트 하나당 높이
-    final maxEvents = (availableForEvents / eventHeight).floor().clamp(1, 6); // 최소 1개, 최대 6개
+    final eventHeight = isMobile ? 16 : 18; // 이벤트 하나당 높이 (margin 포함)
+    final padding = 6; // 패딩과 여백
+    final moreButtonHeight = isMobile ? 16 : 18; // "+N개 더보기" 버튼 높이
+    
+    // 더 안전한 계산: 여유 공간을 더 많이 둠
+    final availableForEvents = rowHeight - dateHeight - padding;
+    
+    // "더보기" 버튼을 위한 공간을 미리 확보
+    final maxEventsRaw = ((availableForEvents - moreButtonHeight) / eventHeight).floor();
+    final maxEvents = events.length > maxEventsRaw 
+        ? maxEventsRaw.clamp(1, 4) // 더보기가 필요하면 더 보수적으로
+        : (availableForEvents / eventHeight).floor().clamp(1, 5); // 더보기가 불필요하면 더 많이 표시
     
     final fontSize = isMobile ? 8.0 : 9.0;
     
@@ -290,71 +299,92 @@ class _MonthViewState extends ConsumerState<MonthView> {
               ),
             ),
           ),
-          // 일정들 (전체 폭 사용)
+          // 일정들 (전체 폭 사용) - 오버플로우 방지를 위해 SingleChildScrollView 사용
           Expanded(
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 1), // 패딩 최소화
-              child: Column(
-                children: [
-                  // 실제 일정들 표시
-                  ...events.take(maxEvents).map((event) => GestureDetector(
-                    onTap: () => _showEventDetail(event), // 일정 상세보기
-                    child: Container(
-                      width: double.infinity, // 전체 폭 사용
-                      margin: const EdgeInsets.only(bottom: 1),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 1 : 2, // 내부 패딩 더 줄임
-                        vertical: 0.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: event.color ?? Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Text(
-                        event.title,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )).toList(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // 실제 사용 가능한 높이로 다시 계산
+                  final actualMaxEvents = (constraints.maxHeight / eventHeight).floor();
+                  final safeMaxEvents = actualMaxEvents > 1 
+                      ? (events.length > actualMaxEvents ? actualMaxEvents - 1 : actualMaxEvents)
+                      : 1;
+                  final displayEvents = events.take(safeMaxEvents).toList();
                   
-                  // 더 많은 일정이 있으면 "+N개 더보기" 표시
-                  if (events.length > maxEvents)
-                    GestureDetector(
-                      onTap: () => _showAllEventsForDay(day, events),
-                      child: Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(top: 1),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 1 : 2,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(2),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                            width: 0.5,
+                  return SingleChildScrollView(
+                    physics: const NeverScrollableScrollPhysics(), // 스크롤 비활성화
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 실제 일정들 표시
+                        ...displayEvents.map((event) => GestureDetector(
+                          onTap: () => _showEventDetail(event), // 일정 상세보기
+                          child: Container(
+                            width: double.infinity, // 전체 폭 사용
+                            height: eventHeight - 2, // 고정 높이
+                            margin: const EdgeInsets.only(bottom: 1),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 1 : 2, // 내부 패딩 더 줄임
+                              vertical: 0.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: event.color ?? Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                event.title,
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          '+${events.length - maxEvents}개 더보기',
-                          style: TextStyle(
-                            fontSize: fontSize - 1,
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w600,
+                        )).toList(),
+                        
+                        // 더 많은 일정이 있으면 "+N개 더보기" 표시
+                        if (events.length > safeMaxEvents)
+                          GestureDetector(
+                            onTap: () => _showAllEventsForDay(day, events),
+                            child: Container(
+                              width: double.infinity,
+                              height: eventHeight - 2, // 고정 높이
+                              margin: const EdgeInsets.only(top: 1),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 1 : 2,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '+${events.length - safeMaxEvents}개 더보기',
+                                  style: TextStyle(
+                                    fontSize: fontSize - 1,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                      ],
                     ),
-                ],
+                  );
+                },
               ),
             ),
           ),

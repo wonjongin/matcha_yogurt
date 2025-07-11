@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/models.dart';
+import '../services/event_service.dart';
 export 'team_providers.dart';
 export 'search_providers.dart';
 
@@ -17,76 +18,25 @@ final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 // 현재 캘린더 뷰
 final currentViewProvider = StateProvider<CalendarView>((ref) => CalendarView.month);
 
-// Sample events for testing
-final sampleEventsProvider = Provider<List<Event>>((ref) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  
-  return [
-    Event(
-      title: '팀 미팅',
-      description: '주간 업무 회의입니다.',
-      startTime: today.add(const Duration(hours: 10)),
-      endTime: today.add(const Duration(hours: 11)),
-      teamId: 'team1',
-      createdBy: 'user1',
-      type: EventType.meeting,
-      color: Colors.blue,
-    ),
-    Event(
-      title: '프로젝트 마감',
-      description: '최종 발표 준비 완료해야 합니다.',
-      startTime: today.add(const Duration(days: 2, hours: 18)),
-      endTime: today.add(const Duration(days: 2, hours: 19)),
-      teamId: 'team1',
-      createdBy: 'user2',
-      type: EventType.deadline,
-      color: Colors.red,
-    ),
-    Event(
-      title: '생일 파티',
-      description: '김철수 생일 축하 파티',
-      startTime: today.add(const Duration(days: 5)),
-      endTime: today.add(const Duration(days: 5, hours: 3)),
-      teamId: 'team1',
-      createdBy: 'user3',
-      type: EventType.celebration,
-      color: Colors.pink,
-      isAllDay: true,
-    ),
-    Event(
-      title: '코드 리뷰',
-      description: '새로운 기능에 대한 코드 리뷰를 진행합니다.',
-      startTime: today.add(const Duration(days: 1, hours: 14)),
-      endTime: today.add(const Duration(days: 1, hours: 15, minutes: 30)),
-      teamId: 'team1',
-      createdBy: 'user1',
-      type: EventType.meeting,
-      color: Colors.green,
-    ),
-    Event(
-      title: '문서 작성 완료',
-      description: 'API 문서 작성을 완료해야 합니다.',
-      startTime: today.add(const Duration(days: 3, hours: 16)),
-      endTime: today.add(const Duration(days: 3, hours: 17)),
-      teamId: 'team1',
-      createdBy: 'user2',
-      type: EventType.reminder,
-      color: Colors.orange,
-    ),
-  ];
-});
-
 // Events provider that can be modified
 final eventsProvider = StateNotifierProvider<EventsNotifier, List<Event>>((ref) {
-  final sampleEvents = ref.watch(sampleEventsProvider);
-  return EventsNotifier(sampleEvents);
+  // 빈 리스트로 시작 - 실제 일정은 서버에서 로드
+  return EventsNotifier([]);
 });
 
 // Provider to get events for a specific day
 final eventsForDayProvider = Provider.family<List<Event>, DateTime>((ref, day) {
   final events = ref.watch(eventsProvider);
-  return events.where((event) => isSameDay(event.startTime, day)).toList();
+  return events.where((event) {
+    // 해당 날짜가 이벤트 기간 내에 있는지 확인
+    final eventStartDay = DateTime(event.startTime.year, event.startTime.month, event.startTime.day);
+    final eventEndDay = DateTime(event.endTime.year, event.endTime.month, event.endTime.day);
+    final targetDay = DateTime(day.year, day.month, day.day);
+    
+    return targetDay.isAtSameMomentAs(eventStartDay) || 
+           targetDay.isAtSameMomentAs(eventEndDay) ||
+           (targetDay.isAfter(eventStartDay) && targetDay.isBefore(eventEndDay));
+  }).toList();
 });
 
 // Provider to get events for selected day (used in UI)
@@ -157,22 +107,78 @@ final teamsProvider = StateNotifierProvider<TeamsNotifier, List<Team>>((ref) {
 class EventsNotifier extends StateNotifier<List<Event>> {
   EventsNotifier(List<Event> initialEvents) : super(initialEvents);
 
-  void addEvent(Event event) {
-    state = [...state, event];
+  Future<Event> addEvent(Event event, String userId) async {
+    try {
+      // 서버에 일정 생성 요청
+      final createdEvent = await EventService.createEvent(
+        title: event.title,
+        description: event.description,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        userId: userId,
+        teamId: event.teamId.isEmpty ? null : event.teamId, // 빈 문자열인 경우 null로 변환
+        eventType: event.type,
+        color: event.color?.value.toRadixString(16),
+        isAllDay: event.isAllDay,
+      );
+
+      // 서버 생성 성공 시 로컬 상태 업데이트
+      state = [...state, createdEvent];
+      return createdEvent;
+    } catch (e) {
+      throw Exception('일정 생성에 실패했습니다: $e');
+    }
   }
 
-  void updateEvent(Event updatedEvent) {
-    state = state.map((event) {
-      return event.id == updatedEvent.id ? updatedEvent : event;
-    }).toList();
+  Future<Event> updateEvent(Event updatedEvent) async {
+    try {
+      // 서버에 일정 수정 요청
+      final serverUpdatedEvent = await EventService.updateEvent(
+        eventId: updatedEvent.id!,
+        title: updatedEvent.title,
+        description: updatedEvent.description,
+        startTime: updatedEvent.startTime,
+        endTime: updatedEvent.endTime,
+        teamId: updatedEvent.teamId,
+        eventType: updatedEvent.type,
+        color: updatedEvent.color?.value.toRadixString(16),
+        isAllDay: updatedEvent.isAllDay,
+      );
+
+      // 서버 수정 성공 시 로컬 상태 업데이트
+      state = state.map((event) {
+        return event.id == serverUpdatedEvent.id ? serverUpdatedEvent : event;
+      }).toList();
+      
+      return serverUpdatedEvent;
+    } catch (e) {
+      throw Exception('일정 수정에 실패했습니다: $e');
+    }
   }
 
-  void removeEvent(String eventId) {
-    state = state.where((event) => event.id != eventId).toList();
+  Future<void> removeEvent(String eventId) async {
+    try {
+      // 서버에 일정 삭제 요청
+      await EventService.deleteEvent(eventId);
+
+      // 서버 삭제 성공 시 로컬 상태 업데이트
+      state = state.where((event) => event.id != eventId).toList();
+    } catch (e) {
+      throw Exception('일정 삭제에 실패했습니다: $e');
+    }
   }
 
   List<Event> getEventsForDay(DateTime day) {
-    return state.where((event) => isSameDay(event.startTime, day)).toList();
+    return state.where((event) {
+      // 해당 날짜가 이벤트 기간 내에 있는지 확인
+      final eventStartDay = DateTime(event.startTime.year, event.startTime.month, event.startTime.day);
+      final eventEndDay = DateTime(event.endTime.year, event.endTime.month, event.endTime.day);
+      final targetDay = DateTime(day.year, day.month, day.day);
+      
+      return targetDay.isAtSameMomentAs(eventStartDay) || 
+             targetDay.isAtSameMomentAs(eventEndDay) ||
+             (targetDay.isAfter(eventStartDay) && targetDay.isBefore(eventEndDay));
+    }).toList();
   }
 
   List<Event> getEventsForTeam(String teamId) {
