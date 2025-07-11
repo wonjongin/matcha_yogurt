@@ -57,11 +57,28 @@ class Team {
       id: json['id'],
       name: json['name'],
       description: json['description'],
-      color: Color(json['color']),
+      color: _parseColor(json['color']),
       ownerId: json['ownerId'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
     );
+  }
+
+  static Color _parseColor(dynamic colorValue) {
+    if (colorValue is String) {
+      // Hex color string (#3b82f6) 처리
+      String hexColor = colorValue.replaceAll('#', '');
+      if (hexColor.length == 6) {
+        hexColor = 'FF$hexColor'; // Add alpha channel
+      }
+      return Color(int.parse(hexColor, radix: 16));
+    } else if (colorValue is int) {
+      // Integer color value 처리
+      return Color(colorValue);
+    } else {
+      // 기본값 반환
+      return Colors.blue;
+    }
   }
 
   @override

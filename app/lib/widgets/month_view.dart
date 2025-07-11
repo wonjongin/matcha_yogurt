@@ -94,7 +94,7 @@ class _MonthViewState extends ConsumerState<MonthView> {
 
   Widget _buildMobileHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // 패딩 줄임
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -118,12 +118,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
 
   Widget _buildDesktopHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // 패딩 줄임
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            DateFormat('MMMM yyyy').format(widget.focusedDay),
+            DateFormat('yyyy년 MM월').format(widget.focusedDay),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -152,8 +152,11 @@ class _MonthViewState extends ConsumerState<MonthView> {
   }
 
   Widget _buildFullScreenCalendar() {
+    final daysOfWeekHeight = isMobile ? 35.0 : 40.0;
+    final headerHeight = isMobile ? 50.0 : 60.0;
+    
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
+      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
@@ -165,63 +168,94 @@ class _MonthViewState extends ConsumerState<MonthView> {
           ),
         ],
       ),
-      child: TableCalendar<Event>(
-        firstDay: DateTime.utc(2020, 1, 1),
-        lastDay: DateTime.utc(2030, 12, 31),
-        focusedDay: widget.focusedDay,
-        selectedDayPredicate: (day) => isSameDay(widget.selectedDay, day),
-        onDaySelected: (selectedDay, focusedDay) {
-          widget.onDaySelected(selectedDay, focusedDay);
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 사용 가능한 높이에서 헤더와 요일 행을 제외한 높이 계산
+          final availableHeight = constraints.maxHeight - headerHeight - daysOfWeekHeight - 16; // 여백 16px
           
-          // 모바일에서는 하단 시트 표시
-          if (isMobile) {
-            _showEventBottomSheet(selectedDay);
-          }
+          // 현재 달의 주 수 계산 (5주 또는 6주)
+          final firstDayOfMonth = DateTime(widget.focusedDay.year, widget.focusedDay.month, 1);
+          final lastDayOfMonth = DateTime(widget.focusedDay.year, widget.focusedDay.month + 1, 0);
+          
+          // 첫 주의 시작일과 마지막 주의 끝일 계산
+          final firstDayOfWeek = firstDayOfMonth.subtract(Duration(days: firstDayOfMonth.weekday % 7));
+          final lastDayOfWeek = lastDayOfMonth.add(Duration(days: 6 - lastDayOfMonth.weekday % 7));
+          
+          final numberOfWeeks = ((lastDayOfWeek.difference(firstDayOfWeek).inDays + 1) / 7).ceil();
+          
+          // 실제 주 수에 맞춰 행 높이 계산
+          final calculatedRowHeight = (availableHeight / numberOfWeeks).clamp(
+            isMobile ? 50.0 : 60.0, // 최소 높이
+            isMobile ? 110.0 : 130.0, // 최대 높이
+          );
+          
+          return TableCalendar<Event>(
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: widget.focusedDay,
+            selectedDayPredicate: (day) => isSameDay(widget.selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              widget.onDaySelected(selectedDay, focusedDay);
+              
+              // 모바일에서는 하단 시트 표시
+              if (isMobile) {
+                _showEventBottomSheet(selectedDay);
+              }
+            },
+            onFormatChanged: (format) {
+              setState(() {
+                _calendarFormat = format;
+              });
+            },
+            onPageChanged: widget.onPageChanged,
+            calendarFormat: _calendarFormat,
+            eventLoader: (day) => ref.read(eventsForDayProvider(day)),
+            
+            // 커스텀 셀 빌더로 일정 제목들 표시
+            calendarBuilders: CalendarBuilders(
+              defaultBuilder: (context, day, focusedDay) => _buildDayCell(day, false, false, calculatedRowHeight),
+              selectedBuilder: (context, day, focusedDay) => _buildDayCell(day, true, false, calculatedRowHeight),
+              todayBuilder: (context, day, focusedDay) => _buildDayCell(day, false, true, calculatedRowHeight),
+            ),
+            
+            daysOfWeekHeight: daysOfWeekHeight,
+            rowHeight: calculatedRowHeight,
+            
+            calendarStyle: CalendarStyle(
+              outsideDaysVisible: false,
+              canMarkersOverflow: false,
+              markersMaxCount: 0, // 마커(점) 완전 비활성화
+              markerDecoration: const BoxDecoration(), // 마커 스타일 제거
+            ),
+            headerStyle: HeaderStyle(
+              formatButtonVisible: !isMobile,
+              titleCentered: true,
+              titleTextFormatter: (date, locale) => '${date.year}년 ${date.month}월', // 한국식 날짜 포맷
+              leftChevronIcon: Icon(
+                Icons.chevron_left,
+                size: isMobile ? 20 : 24,
+              ),
+              rightChevronIcon: Icon(
+                Icons.chevron_right,
+                size: isMobile ? 20 : 24,
+              ),
+            ),
+          );
         },
-        onFormatChanged: (format) {
-          setState(() {
-            _calendarFormat = format;
-          });
-        },
-        onPageChanged: widget.onPageChanged,
-        calendarFormat: _calendarFormat,
-        eventLoader: (day) => ref.read(eventsForDayProvider(day)),
-        
-        // 커스텀 셀 빌더로 일정 제목들 표시
-        calendarBuilders: CalendarBuilders(
-          defaultBuilder: (context, day, focusedDay) => _buildDayCell(day, false, false),
-          selectedBuilder: (context, day, focusedDay) => _buildDayCell(day, true, false),
-          todayBuilder: (context, day, focusedDay) => _buildDayCell(day, false, true),
-        ),
-        
-        daysOfWeekHeight: isMobile ? 35 : 40,
-        rowHeight: isMobile ? 80 : 100, // 일정들을 표시할 공간
-        
-        calendarStyle: CalendarStyle(
-          outsideDaysVisible: false,
-          // 기본 스타일은 비활성화 (커스텀 빌더 사용)
-          canMarkersOverflow: false,
-        ),
-        headerStyle: HeaderStyle(
-          formatButtonVisible: !isMobile, // 모바일에서는 포맷 버튼 숨김
-          titleCentered: true,
-          leftChevronIcon: Icon(
-            Icons.chevron_left,
-            size: isMobile ? 20 : 24,
-          ),
-          rightChevronIcon: Icon(
-            Icons.chevron_right,
-            size: isMobile ? 20 : 24,
-          ),
-        ),
       ),
     );
   }
 
-  Widget _buildDayCell(DateTime day, bool isSelected, bool isToday) {
+  Widget _buildDayCell(DateTime day, bool isSelected, bool isToday, double rowHeight) {
     final events = ref.watch(eventsForDayProvider(day));
-    final maxEvents = isMobile ? 2 : 4; // 모바일에서는 2개, 데스크톱에서는 4개까지
-    final fontSize = isMobile ? 10.0 : 11.0;
+    
+    // 날짜 숫자 높이와 여백을 제외한 공간으로 표시 가능한 이벤트 수 계산
+    final dateHeight = isMobile ? 18 : 20;
+    final availableForEvents = rowHeight - dateHeight - 6; // 여백
+    final eventHeight = isMobile ? 14 : 16; // 이벤트 하나당 높이
+    final maxEvents = (availableForEvents / eventHeight).floor().clamp(1, 6); // 최소 1개, 최대 6개
+    
+    final fontSize = isMobile ? 8.0 : 9.0;
     
     return Container(
       margin: const EdgeInsets.all(1),
@@ -240,12 +274,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
         children: [
           // 날짜 숫자
           Container(
-            height: isMobile ? 20 : 24,
+            height: dateHeight.toDouble(),
             child: Center(
               child: Text(
                 '${day.day}',
                 style: TextStyle(
-                  fontSize: isMobile ? 14 : 16,
+                  fontSize: isMobile ? 12 : 14, // 줄임
                   fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? Theme.of(context).colorScheme.onPrimaryContainer
@@ -270,12 +304,12 @@ class _MonthViewState extends ConsumerState<MonthView> {
                       width: double.infinity, // 전체 폭 사용
                       margin: const EdgeInsets.only(bottom: 1),
                       padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 3 : 4, // 내부 패딩 조정
-                        vertical: 1,
+                        horizontal: isMobile ? 1 : 2, // 내부 패딩 더 줄임
+                        vertical: 0.5,
                       ),
                       decoration: BoxDecoration(
                         color: event.color ?? Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
                         event.title,
@@ -290,19 +324,34 @@ class _MonthViewState extends ConsumerState<MonthView> {
                     ),
                   )).toList(),
                   
-                  // 더 많은 일정이 있으면 "+N개 더" 표시
+                  // 더 많은 일정이 있으면 "+N개 더보기" 표시
                   if (events.length > maxEvents)
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(top: 1),
-                      child: Text(
-                        '+${events.length - maxEvents}개 더',
-                        style: TextStyle(
-                          fontSize: fontSize - 1,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          fontWeight: FontWeight.w500,
+                    GestureDetector(
+                      onTap: () => _showAllEventsForDay(day, events),
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 1),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 1 : 2,
+                          vertical: 1,
                         ),
-                        textAlign: TextAlign.center,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(2),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          '+${events.length - maxEvents}개 더보기',
+                          style: TextStyle(
+                            fontSize: fontSize - 1,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                 ],
@@ -312,6 +361,61 @@ class _MonthViewState extends ConsumerState<MonthView> {
         ],
       ),
     );
+  }
+
+  // 해당 날짜의 모든 일정 보기 (바텀 시트 또는 다이얼로그)
+  void _showAllEventsForDay(DateTime day, List<Event> events) {
+    if (isMobile) {
+      _showEventBottomSheet(day);
+    } else {
+      // 데스크톱에서는 다이얼로그로 표시
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 400,
+            height: 500,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${DateFormat('MM월 dd일').format(day)} 일정',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+                      return EventCard(
+                        event: event,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showEventDetail(event);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   // 일정 상세보기 다이얼로그
@@ -538,6 +642,8 @@ class _MonthViewState extends ConsumerState<MonthView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: true, // 배경 탭으로 닫기 활성화
+      enableDrag: true, // 드래그로 닫기 활성화
       backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.4,

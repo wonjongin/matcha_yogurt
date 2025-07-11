@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb 추가
+import 'package:flutter/services.dart'; // HapticFeedback 추가
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -176,93 +177,130 @@ class _GoogleStyleThreeDayViewState extends ConsumerState<GoogleStyleThreeDayVie
       ),
       child: Row(
         children: [
-          // Empty space for time column
+          // 이전 날 버튼
           SizedBox(
-            width: _timeColumnWidth,
+            width: 48,
             height: 80,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  right: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 1,
-                  ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _navigateToPreviousDay(),
+                child: Icon(
+                  Icons.chevron_left,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
           ),
-                     // Date headers with horizontal scroll
-           Expanded(
-             child: SingleChildScrollView(
-               controller: _headerHorizontalScrollController,
-               scrollDirection: Axis.horizontal,
-               child: SizedBox(
-                 width: threeDays.length * _dayColumnWidth,
-                 child: Row(
-                   children: threeDays.map((day) {
-                     final isToday = isSameDay(day, DateTime.now());
-                     final isSelected = isSameDay(day, widget.selectedDay);
+          // Time column과 날짜 헤더들
+          Expanded(
+            child: Row(
+              children: [
+                // Time column
+                SizedBox(
+                  width: _timeColumnWidth - 48, // 버튼 공간만큼 줄임
+                  height: 80,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Date headers with horizontal scroll
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _headerHorizontalScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: threeDays.length * _dayColumnWidth,
+                      child: Row(
+                        children: threeDays.map((day) {
+                          final isToday = isSameDay(day, DateTime.now());
+                          final isSelected = isSameDay(day, widget.selectedDay);
 
-                     return SizedBox(
-                       width: _dayColumnWidth,
-                       child: GestureDetector(
-                         onTap: () => widget.onDayChanged(day),
-                         child: Container(
-                           height: 80,
-                           decoration: BoxDecoration(
-                             color: isSelected
-                                 ? Theme.of(context).colorScheme.primaryContainer
-                                 : Colors.transparent,
-                             border: Border(
-                               right: BorderSide(
-                                 color: Theme.of(context).dividerColor,
-                                 width: 1,
-                               ),
-                             ),
-                           ),
-                           child: Column(
-                             mainAxisAlignment: MainAxisAlignment.center,
-                             children: [
-                               Text(
-                                 DateFormat('E').format(day),
-                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                       color: isToday
-                                           ? Theme.of(context).colorScheme.primary
-                                           : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                                     ),
-                               ),
-                               const SizedBox(height: 4),
-                               Container(
-                                 width: 32,
-                                 height: 32,
-                                 decoration: BoxDecoration(
-                                   color: isToday
-                                       ? Theme.of(context).colorScheme.primary
-                                       : Colors.transparent,
-                                   shape: BoxShape.circle,
-                                 ),
-                                 child: Center(
-                                   child: Text(
-                                     '${day.day}',
-                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                           color: isToday
-                                               ? Theme.of(context).colorScheme.onPrimary
-                                               : Theme.of(context).colorScheme.onSurface,
-                                           fontWeight: FontWeight.w600,
-                                         ),
-                                   ),
-                                 ),
-                               ),
-                             ],
-                           ),
-                         ),
-                       ),
-                     );
-                   }).toList(),
-                 ),
-               ),
-             ),
-           ),
+                          return SizedBox(
+                            width: _dayColumnWidth,
+                            child: GestureDetector(
+                              onTap: () => widget.onDayChanged(day),
+                              child: Container(
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primaryContainer
+                                      : Colors.transparent,
+                                  border: Border(
+                                    right: BorderSide(
+                                      color: Theme.of(context).dividerColor,
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _getDayOfWeekKorean(day),
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: isToday
+                                                ? Theme.of(context).colorScheme.primary
+                                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: isToday
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${day.day}',
+                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                color: isToday
+                                                    ? Theme.of(context).colorScheme.onPrimary
+                                                    : Theme.of(context).colorScheme.onSurface,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 다음 날 버튼
+          SizedBox(
+            width: 48,
+            height: 80,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _navigateToNextDay(),
+                child: Icon(
+                  Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -308,6 +346,7 @@ class _GoogleStyleThreeDayViewState extends ConsumerState<GoogleStyleThreeDayVie
     
     return GestureDetector(
       onDoubleTap: () => _navigateToEventForm(initialDate: day),
+      onLongPressStart: (details) => _handleLongPress(day, details),
       child: Container(
         decoration: BoxDecoration(
           border: Border(
@@ -455,6 +494,34 @@ class _GoogleStyleThreeDayViewState extends ConsumerState<GoogleStyleThreeDayVie
     );
   }
 
+  void _handleLongPress(DateTime day, LongPressStartDetails details) {
+    // 터치한 Y 좌표에서 시간 계산
+    final yPosition = details.localPosition.dy;
+    final hourDecimal = yPosition / _hourHeight;
+    
+    // 30분 단위로 스냅 (0.5 = 30분)
+    final snappedHour = (hourDecimal * 2).round() / 2;
+    final hour = snappedHour.floor();
+    final minute = ((snappedHour - hour) * 60).round();
+    
+    // 유효한 시간 범위 체크 (0-23시)
+    if (hour >= 0 && hour < 24) {
+      final selectedDateTime = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        hour,
+        minute,
+      );
+      
+      // 햅틱 피드백
+      HapticFeedback.mediumImpact();
+      
+      // 선택된 시간으로 일정 생성 화면 이동
+      _navigateToEventForm(initialDate: selectedDateTime);
+    }
+  }
+
   void _navigateToEventForm({Event? existingEvent, DateTime? initialDate}) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -466,9 +533,24 @@ class _GoogleStyleThreeDayViewState extends ConsumerState<GoogleStyleThreeDayVie
     );
   }
 
+  void _navigateToPreviousDay() {
+    final previousDay = widget.selectedDay.subtract(const Duration(days: 1));
+    widget.onDayChanged(previousDay);
+  }
+
+  void _navigateToNextDay() {
+    final nextDay = widget.selectedDay.add(const Duration(days: 1));
+    widget.onDayChanged(nextDay);
+  }
+
   bool isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
+  }
+
+  String _getDayOfWeekKorean(DateTime day) {
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    return dayNames[day.weekday % 7]; // weekday는 1(월)부터 7(일)까지
   }
 } 

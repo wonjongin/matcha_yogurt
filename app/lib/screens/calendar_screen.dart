@@ -5,11 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/models.dart';
 import '../providers/calendar_providers.dart';
+import '../providers/invitation_providers.dart';
 import '../widgets/month_view.dart';
 import '../widgets/google_style_three_day_view.dart';
 import '../widgets/week_view.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'team_management_screen.dart';
+import 'invitations_screen.dart';
+import 'event_form_screen.dart'; // Added import for EventFormScreen
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -35,12 +39,197 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       body: isMobile 
           ? _buildMobileLayout(currentView, selectedDate)
           : _buildDesktopLayout(currentView, selectedDate),
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    final invitationCount = ref.watch(invitationCountProvider);
+    
+    return Stack(
+      children: [
+        FloatingActionButton(
+          onPressed: () {
+            _showActionMenu();
+          },
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          child: const Icon(Icons.menu, color: Colors.white),
+        ),
+        if (invitationCount > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 20,
+                minHeight: 20,
+              ),
+              child: Text(
+                invitationCount > 99 ? '99+' : invitationCount.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showActionMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            _buildActionItem(
+              icon: Icons.mail,
+              title: '받은 초대',
+              subtitle: '팀 초대 확인하기',
+              color: Colors.orange,
+              badge: ref.watch(invitationCountProvider),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToInvitations();
+              },
+            ),
+            _buildActionItem(
+              icon: Icons.groups,
+              title: '팀 관리',
+              subtitle: '팀 만들기 및 관리',
+              color: Colors.blue,
+              badge: 0,
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToTeamManagement();
+              },
+            ),
+            _buildActionItem(
+              icon: Icons.add,
+              title: '일정 추가',
+              subtitle: '새로운 일정 만들기',
+              color: Colors.green,
+              badge: 0,
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToEventForm();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    int badge = 0,
+  }) {
+    return ListTile(
+      leading: Stack(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+          ),
+          if (badge > 0)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+                child: Text(
+                  badge > 99 ? '99+' : badge.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      title: Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+      subtitle: Text(subtitle),
+      onTap: onTap,
     );
   }
 
   AppBar _buildAppBar(CalendarView currentView, DateTime selectedDate, User? currentUser) {
     return AppBar(
-      title: Text(_getTitle(currentView, selectedDate)),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Matcha',
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18,
+              fontWeight: FontWeight.bold,
+              height: 1.0,
+            ),
+          ),
+          Text(
+            'Yogurt',
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 16,
+              fontWeight: FontWeight.w500,
+              height: 1.0,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
       actions: [
         // 현재 사용자 표시
         if (currentUser != null) ...[
@@ -80,15 +269,40 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
       itemBuilder: (context) => [
         PopupMenuItem(
-          value: 'profile',
+          enabled: false, // 비활성화된 계정 이름 표시
           child: Row(
             children: [
-              const Icon(Icons.person),
+              Icon(
+                Icons.account_circle,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
               const SizedBox(width: 8),
-              Text('프로필'),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      currentUser.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      currentUser.email,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
+        const PopupMenuDivider(), // 구분선 추가
         PopupMenuItem(
           value: 'logout',
           child: Row(
@@ -104,7 +318,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         if (value == 'logout') {
           await _handleLogout();
         }
-        // 프로필 기능은 나중에 구현
       },
     );
   }
@@ -136,17 +349,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         segments: const [
           ButtonSegment<CalendarView>(
             value: CalendarView.month,
-            label: Text('월간 보기'),
+            label: Text('월간'),
             icon: Icon(Icons.calendar_view_month),
           ),
           ButtonSegment<CalendarView>(
             value: CalendarView.week,
-            label: Text('주간 보기'),
+            label: Text('주간'),
             icon: Icon(Icons.calendar_view_week),
           ),
           ButtonSegment<CalendarView>(
             value: CalendarView.threeDay,
-            label: Text('3일 보기'),
+            label: Text('3일'),
             icon: Icon(Icons.view_day),
           ),
         ],
@@ -164,9 +377,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Widget _buildDesktopLayout(CalendarView view, DateTime selectedDate) {
-    // 데스크톱+태블릿: 여백과 더 큰 컴포넌트
+    // 데스크톱+태블릿: 좌우 최소 여백만, 상하는 꽉 채움
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: _buildCalendarView(view, selectedDate),
     );
   }
@@ -237,6 +450,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _navigateToTeamManagement() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TeamManagementScreen(),
+      ),
+    );
+  }
+
+  void _navigateToInvitations() async {
+    // 초대 화면에서 돌아올 때 초대 목록 새로고침
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const InvitationsScreen(),
+      ),
+    );
+    
+    // 돌아왔을 때 초대 목록 새로고침
+    ref.read(refreshInvitationsProvider)();
+  }
+
+  void _navigateToEventForm() {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => EventFormScreen(
+            initialDate: ref.read(selectedDateProvider),
+          ),
+        ),
+      );
     }
   }
 }

@@ -64,6 +64,18 @@ final sampleUsersProvider = Provider<List<User>>((ref) {
       name: '최정은',
       email: 'choi@example.com',
     ),
+    // 서버의 테스트 사용자 추가
+    User(
+      id: 'cmcyvh4si0000cnsc4kuvyxsp',
+      name: '테스트 사용자',
+      email: 'test@example.com',
+    ),
+    // 서버의 김민수 사용자 추가
+    User(
+      id: 'cmcyvhuky0001cnsc6e9xcrbv',
+      name: '김민수',
+      email: 'minsu@example.com',
+    ),
   ];
 });
 
@@ -116,6 +128,30 @@ class TeamMembersNotifier extends StateNotifier<List<TeamMember>> {
         teamId: 'team3',
         userId: 'user5',
         role: TeamRole.member,
+      ),
+      // 테스트 팀 멤버 (서버 데이터와 동기화)
+      TeamMember(
+        teamId: 'cmcyvq77b0000cnau5vvxfkgk',
+        userId: 'cmcyvh4si0000cnsc4kuvyxsp',
+        role: TeamRole.owner,
+      ),
+      // 김민수 - 테스트 팀 멤버
+      TeamMember(
+        teamId: 'cmcyvq77b0000cnau5vvxfkgk',
+        userId: 'cmcyvhuky0001cnsc6e9xcrbv',
+        role: TeamRole.member,
+      ),
+      // 김민수 - 스터디 팀 소유자
+      TeamMember(
+        teamId: 'cmcywk66k000acnoqjio68mt2',
+        userId: 'cmcyvhuky0001cnsc6e9xcrbv',
+        role: TeamRole.owner,
+      ),
+      // 김민수 - ㅁㄴㅇㄹ 팀 소유자
+      TeamMember(
+        teamId: 'cmcywksbc0000cn9mhi8luugl',
+        userId: 'cmcyvhuky0001cnsc6e9xcrbv',
+        role: TeamRole.owner,
       ),
     ];
   }

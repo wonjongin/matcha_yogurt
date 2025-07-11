@@ -28,18 +28,17 @@ enum EventType {
 
 // Models
 model User {
-  id              String   @id @default(cuid())
-  name            String
-  email           String   @unique
-  password        String   // 해시된 비밀번호
-  profileImageUrl String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  password    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  // Relations
-  ownedTeams   Team[]       @relation("TeamOwner")
+  ownedTeams   Team[]
   teamMembers  TeamMember[]
   events       Event[]
+  sentInvitations TeamInvitation[] @relation("InviterRelation")
 
   @@map("users")
 }
@@ -47,16 +46,16 @@ model User {
 model Team {
   id          String   @id @default(cuid())
   name        String
-  description String
-  color       String   // Hex color string
+  description String?
+  color       String   @default("#3b82f6") // 기본 파란색
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  owner   User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members TeamMember[]
-  events  Event[]
+  owner    User         @relation(fields: [ownerId], references: [id])
+  members  TeamMember[]
+  events   Event[]
+  invitations TeamInvitation[]
 
   @@map("teams")
 }
@@ -97,4 +96,30 @@ model Event {
   userId String
 
   @@map("events")
+}
+
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  email     String
+  teamId    String
+  invitedBy String
+  role      TeamRole @default(MEMBER)
+  status    InvitationStatus @default(PENDING)
+  token     String   @unique @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
+
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  inviter   User @relation("InviterRelation", fields: [invitedBy], references: [id])
+
+  @@unique([email, teamId])
+  @@map("team_invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }

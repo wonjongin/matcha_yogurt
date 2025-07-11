@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000';
-  static const String tokenKey = 'jwt_token';
+  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
+  static String get tokenKey => dotenv.env['JWT_TOKEN_KEY'] ?? 'jwt_token';
   
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -138,7 +139,7 @@ class ApiService {
   }
 
   // 응답 처리 헬퍼
-  static Map<String, dynamic> handleResponse(http.Response response) {
+  static dynamic handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return json.decode(response.body);
     } else {

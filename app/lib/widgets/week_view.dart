@@ -169,89 +169,126 @@ class _WeekViewState extends ConsumerState<WeekView> {
       ),
       child: Row(
         children: [
-          // Empty space for time column
+          // 이전 주 버튼
           SizedBox(
-            width: _timeColumnWidth,
+            width: 48,
             height: 80,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  right: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 1,
-                  ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _navigateToPreviousWeek(),
+                child: Icon(
+                  Icons.chevron_left,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
           ),
-          // Date headers - scrollable
+          // Time column과 날짜 헤더들
           Expanded(
-            child: SingleChildScrollView(
-              controller: _headerHorizontalScrollController,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: weekDays.length * _dayColumnWidth,
-                child: Row(
-                  children: weekDays.map((day) {
-                    final isToday = _isSameDay(day, DateTime.now());
-                    final isSelected = _isSameDay(day, widget.selectedWeek);
-
-                    return SizedBox(
-                      width: _dayColumnWidth,
-                      child: GestureDetector(
-                        onTap: () => widget.onWeekChanged(day),
-                        child: Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Colors.transparent,
-                            border: Border(
-                              right: BorderSide(
-                                color: Theme.of(context).dividerColor,
-                                width: 1,
-                              ),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                DateFormat('E').format(day),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: isToday
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: isToday
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${day.day}',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          color: isToday
-                                              ? Theme.of(context).colorScheme.onPrimary
-                                              : Theme.of(context).colorScheme.onSurface,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+            child: Row(
+              children: [
+                // Time column
+                SizedBox(
+                  width: _timeColumnWidth - 48, // 버튼 공간만큼 줄임
+                  height: 80,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                          width: 1,
                         ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ),
+                ),
+                // Date headers - scrollable
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _headerHorizontalScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: weekDays.length * _dayColumnWidth,
+                      child: Row(
+                        children: weekDays.map((day) {
+                          final isToday = _isSameDay(day, DateTime.now());
+                          final isSelected = _isSameDay(day, widget.selectedWeek);
+
+                          return SizedBox(
+                            width: _dayColumnWidth,
+                            child: GestureDetector(
+                              onTap: () => widget.onWeekChanged(day),
+                              child: Container(
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primaryContainer
+                                      : Colors.transparent,
+                                  border: Border(
+                                    right: BorderSide(
+                                      color: Theme.of(context).dividerColor,
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _getDayOfWeekKorean(day),
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: isToday
+                                                ? Theme.of(context).colorScheme.primary
+                                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: isToday
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${day.day}',
+                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                color: isToday
+                                                    ? Theme.of(context).colorScheme.onPrimary
+                                                    : Theme.of(context).colorScheme.onSurface,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 다음 주 버튼
+          SizedBox(
+            width: 48,
+            height: 80,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _navigateToNextWeek(),
+                child: Icon(
+                  Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -459,5 +496,20 @@ class _WeekViewState extends ConsumerState<WeekView> {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
+  }
+
+  void _navigateToPreviousWeek() {
+    final previousWeek = widget.selectedWeek.subtract(const Duration(days: 7));
+    widget.onWeekChanged(previousWeek);
+  }
+
+  void _navigateToNextWeek() {
+    final nextWeek = widget.selectedWeek.add(const Duration(days: 7));
+    widget.onWeekChanged(nextWeek);
+  }
+
+  String _getDayOfWeekKorean(DateTime day) {
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    return dayNames[day.weekday % 7]; // weekday는 1(월)부터 7(일)까지
   }
 } 

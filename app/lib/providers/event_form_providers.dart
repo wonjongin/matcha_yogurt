@@ -66,7 +66,17 @@ class EventFormNotifier extends StateNotifier<EventFormState> {
   }
 
   void setInitialDate(DateTime date) {
-    final startTime = DateTime(date.year, date.month, date.day, 10, 0);
+    // 전달받은 date가 시간 정보를 포함하고 있으면 그대로 사용, 아니면 기본 시간(10:00) 설정
+    DateTime startTime;
+    
+    if (date.hour == 0 && date.minute == 0) {
+      // 시간 정보가 없는 경우 (00:00) - 기본 시간 설정
+      startTime = DateTime(date.year, date.month, date.day, 10, 0);
+    } else {
+      // 시간 정보가 포함된 경우 - 그대로 사용
+      startTime = date;
+    }
+    
     final endTime = startTime.add(const Duration(hours: 1));
     
     state = state.copyWith(

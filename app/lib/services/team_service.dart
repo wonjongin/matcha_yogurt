@@ -7,13 +7,13 @@ class TeamService {
     required String name,
     required String description,
     required String color,
-    required String ownerId,
+    required String ownerId, // 서버에서 JWT로 자동 설정되므로 실제로는 사용되지 않음
   }) async {
     final response = await ApiService.post('/teams', {
       'name': name,
       'description': description,
       'color': color,
-      'ownerId': ownerId,
+      // ownerId는 서버에서 JWT 토큰을 통해 자동으로 설정됨
     }, requireAuth: true);
 
     final data = ApiService.handleResponse(response);
@@ -116,5 +116,148 @@ class TeamService {
 
     final data = ApiService.handleResponse(response);
     return TeamMember.fromJson(data);
+  }
+
+  // === 초대 관련 메서드들 ===
+
+  // 팀에 이메일로 초대 발송
+  static Future<TeamInvitation> inviteToTeam({
+    required String teamId,
+    required String email,
+    TeamRole role = TeamRole.member,
+  }) async {
+    final response = await ApiService.post('/invitations/teams/$teamId/invite', {
+      'email': email,
+      'role': role.name.toUpperCase(),
+    }, requireAuth: true);
+
+    final data = ApiService.handleResponse(response);
+    return TeamInvitation.fromJson(data);
+  }
+
+  // 내가 받은 초대 목록 조회
+  static Future<List<TeamInvitation>> getMyInvitations() async {
+    try {
+      final response = await ApiService.get('/invitations/my-invitations', requireAuth: true);
+      final data = ApiService.handleResponse(response);
+      
+      // 안전한 타입 체크
+      if (data is List) {
+        final invitationsList = data;
+        return invitationsList
+            .map((invitationJson) {
+              try {
+                return TeamInvitation.fromJson(invitationJson as Map<String, dynamic>);
+              } catch (e) {
+                print('Error parsing invitation: $e');
+                print('Invitation data: $invitationJson');
+                return null;
+              }
+            })
+            .where((invitation) => invitation != null)
+            .cast<TeamInvitation>()
+            .toList();
+      } else {
+        print('Unexpected data type for invitations: ${data.runtimeType}');
+        print('Data: $data');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting my invitations: $e');
+      rethrow;
+    }
+  }
+
+  // 팀의 초대 목록 조회 (팀 관리자용)
+  static Future<List<TeamInvitation>> getTeamInvitations(String teamId) async {
+    try {
+      final response = await ApiService.get('/invitations/teams/$teamId', requireAuth: true);
+      final data = ApiService.handleResponse(response);
+      
+      // 안전한 타입 체크
+      if (data is List) {
+        final invitationsList = data;
+        return invitationsList
+            .map((invitationJson) {
+              try {
+                return TeamInvitation.fromJson(invitationJson as Map<String, dynamic>);
+              } catch (e) {
+                print('Error parsing team invitation: $e');
+                print('Invitation data: $invitationJson');
+                return null;
+              }
+            })
+            .where((invitation) => invitation != null)
+            .cast<TeamInvitation>()
+            .toList();
+      } else {
+        print('Unexpected data type for team invitations: ${data.runtimeType}');
+        print('Data: $data');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting team invitations: $e');
+      rethrow;
+    }
+  }
+
+  // 초대 수락
+  static Future<void> acceptInvitation(String token) async {
+    await ApiService.patch('/invitations/$token/accept', {}, requireAuth: true);
+  }
+
+  // 초대 거절
+  static Future<void> declineInvitation(String token) async {
+    await ApiService.patch('/invitations/$token/decline', {}, requireAuth: true);
+  }
+
+  // 초대 취소 (팀 관리자용)
+  static Future<void> cancelInvitation(String invitationId) async {
+    await ApiService.delete('/invitations/$invitationId', requireAuth: true);
+  }
+
+  // 사용자의 팀 데이터를 서버에서 가져오기 (파싱된 데이터 반환)
+  static Future<({List<Team> teams, List<TeamMember> members, List<User> users})> getUserTeamData(String userId) async {
+    final response = await ApiService.get('/teams?userId=$userId', requireAuth: true);
+    final data = ApiService.handleResponse(response);
+    
+    final serverTeams = <Team>[];
+    final serverMembers = <TeamMember>[];
+    final serverUsers = <User>[];
+    
+    for (final teamData in data as List<dynamic>) {
+      final teamJson = teamData as Map<String, dynamic>;
+      
+      // 팀 정보 추출
+      final team = Team.fromJson(teamJson);
+      serverTeams.add(team);
+      
+      // 멤버 정보 추출 (서버에서 include된 members 데이터)
+      if (teamJson['members'] != null) {
+        final members = teamJson['members'] as List<dynamic>;
+        for (final memberData in members) {
+          final memberJson = memberData as Map<String, dynamic>;
+          
+          final member = TeamMember.fromJson({
+            'id': memberJson['id'],
+            'teamId': memberJson['teamId'],
+            'userId': memberJson['userId'],
+            'role': memberJson['role'],
+            'joinedAt': memberJson['joinedAt'],
+            'updatedAt': memberJson['updatedAt'],
+          });
+          serverMembers.add(member);
+          
+          // 사용자 정보도 추출
+          if (memberJson['user'] != null) {
+            final userJson = memberJson['user'] as Map<String, dynamic>;
+            final user = User.fromJson(userJson);
+            serverUsers.add(user);
+          }
+        }
+      }
+    }
+    
+    return (teams: serverTeams, members: serverMembers, users: serverUsers);
   }
 } 

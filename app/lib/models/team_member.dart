@@ -53,13 +53,25 @@ class TeamMember {
       id: json['id'],
       teamId: json['teamId'],
       userId: json['userId'],
-      role: TeamRole.values.firstWhere(
-        (r) => r.name == json['role'],
-        orElse: () => TeamRole.member,
-      ),
+      role: _parseTeamRole(json['role'] as String),
       joinedAt: DateTime.parse(json['joinedAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
     );
+  }
+
+  static TeamRole _parseTeamRole(String roleString) {
+    switch (roleString.toLowerCase()) {
+      case 'owner':
+        return TeamRole.owner;
+      case 'admin':
+        return TeamRole.admin;
+      case 'member':
+        return TeamRole.member;
+      case 'viewer':
+        return TeamRole.viewer;
+      default:
+        return TeamRole.member;
+    }
   }
 
   bool get canManageTeam => role == TeamRole.owner || role == TeamRole.admin;

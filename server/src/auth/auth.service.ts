@@ -84,7 +84,6 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
-        profileImageUrl: user.profileImageUrl || undefined,
       },
     };
   }
@@ -121,7 +120,6 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
-        profileImageUrl: user.profileImageUrl || undefined,
       },
     };
   }

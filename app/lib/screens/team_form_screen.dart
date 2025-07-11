@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../models/models.dart';
 import '../providers/calendar_providers.dart';
+import '../services/team_service.dart';
 
 class TeamFormScreen extends ConsumerStatefulWidget {
   final Team? existingTeam;
@@ -175,7 +176,7 @@ class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
     );
   }
 
-  void _saveTeam() {
+  Future<void> _saveTeam() async {
     if (_formKey.currentState!.validate()) {
       final currentUser = ref.read(currentUserProvider);
 
@@ -186,36 +187,78 @@ class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
         return;
       }
 
-      final team = Team(
-        id: widget.existingTeam?.id,
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        color: _selectedColor,
-        ownerId: widget.existingTeam?.ownerId ?? currentUser.id,
-      );
-
-      if (widget.existingTeam != null) {
-        ref.read(teamsProvider.notifier).updateTeam(team);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('팀이 수정되었습니다')),
-        );
-      } else {
-        ref.read(teamsProvider.notifier).addTeam(team);
-        
-        // Add the creator as owner
-        final membership = TeamMember(
-          teamId: team.id,
-          userId: currentUser.id,
-          role: TeamRole.owner,
-        );
-        ref.read(teamMembersProvider.notifier).addMember(membership);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('팀이 생성되었습니다')),
+      // Show loading indicator
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
         );
       }
 
-      Navigator.of(context).pop();
+      try {
+        if (widget.existingTeam != null) {
+          // 팀 수정 (서버 API 호출)
+          final updatedTeam = await TeamService.updateTeam(
+            teamId: widget.existingTeam!.id,
+            name: _nameController.text.trim(),
+            description: _descriptionController.text.trim(),
+            color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+          );
+          
+          // 로컬 상태도 즉시 업데이트
+          ref.read(teamsProvider.notifier).updateTeam(updatedTeam);
+          
+          if (mounted) {
+            Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('팀이 수정되었습니다')),
+            );
+          }
+        } else {
+          // 팀 생성 (서버 API 호출)
+          final createdTeam = await TeamService.createTeam(
+            name: _nameController.text.trim(),
+            description: _descriptionController.text.trim(),
+            color: '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+            ownerId: currentUser.id,
+          );
+          
+          // 로컬 state에도 추가하여 즉시 반영
+          ref.read(teamsProvider.notifier).addTeam(createdTeam);
+          
+          // 팀 멤버십도 추가
+          final membership = TeamMember(
+            teamId: createdTeam.id,
+            userId: currentUser.id,
+            role: TeamRole.owner,
+          );
+          ref.read(teamMembersProvider.notifier).addMember(membership);
+          
+          if (mounted) {
+            Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('팀이 생성되었습니다')),
+            );
+          }
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop(true); // 팀 폼 화면 닫기 (수정 완료 결과 전달)
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('팀 ${widget.existingTeam != null ? '수정' : '생성'} 실패: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -231,18 +274,57 @@ class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
-              // Remove all team members
-              ref.read(teamMembersProvider.notifier).removeAllMembersFromTeam(widget.existingTeam!.id);
-              
-              // Remove team
-              ref.read(teamsProvider.notifier).removeTeam(widget.existingTeam!.id);
-              
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close form screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('팀이 삭제되었습니다')),
-              );
+            onPressed: () async {
+              try {
+                Navigator.of(context).pop(); // 다이얼로그 먼저 닫기
+                
+                // 로딩 표시
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          '팀 삭제 중...',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                
+                // 서버에서 팀 삭제 API 호출
+                await TeamService.deleteTeam(widget.existingTeam!.id);
+                
+                // 로컬 상태 업데이트
+                ref.read(teamMembersProvider.notifier).removeAllMembersFromTeam(widget.existingTeam!.id);
+                ref.read(teamsProvider.notifier).removeTeam(widget.existingTeam!.id);
+                
+                if (mounted) {
+                  Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+                  Navigator.of(context).pop(true); // 폼 화면 닫기 (삭제 완료 결과 전달)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('팀이 성공적으로 삭제되었습니다'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('팀 삭제 실패: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('삭제'),

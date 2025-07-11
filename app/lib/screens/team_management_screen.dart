@@ -2,14 +2,84 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../providers/calendar_providers.dart';
+import '../services/team_service.dart';
 import 'team_form_screen.dart';
 import 'team_detail_screen.dart';
 
-class TeamManagementScreen extends ConsumerWidget {
+class TeamManagementScreen extends ConsumerStatefulWidget {
   const TeamManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TeamManagementScreen> createState() => _TeamManagementScreenState();
+}
+
+class _TeamManagementScreenState extends ConsumerState<TeamManagementScreen> {
+  
+  Future<void> _refreshTeamData() async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+    
+    try {
+      // 서버에서 사용자의 최신 팀 데이터 가져오기
+      final teamData = await TeamService.getUserTeamData(currentUser.id);
+      
+      // 기존 팀 데이터를 서버 데이터로 업데이트
+      for (final team in teamData.teams) {
+        final currentTeams = ref.read(teamsProvider);
+        final teamExists = currentTeams.any((t) => t.id == team.id);
+        if (!teamExists) {
+          ref.read(teamsProvider.notifier).addTeam(team);
+        } else {
+          ref.read(teamsProvider.notifier).updateTeam(team);
+        }
+      }
+      
+      // 멤버십 데이터 동기화 (사용자가 속한 팀의 멤버십만)
+      final userTeamIds = teamData.teams.map((t) => t.id).toSet();
+      final currentMembers = ref.read(teamMembersProvider);
+      
+      // 사용자가 더 이상 속하지 않는 팀의 멤버십 제거
+      for (final member in currentMembers) {
+        if (member.userId == currentUser.id && !userTeamIds.contains(member.teamId)) {
+          ref.read(teamMembersProvider.notifier).removeMember(member.id);
+        }
+      }
+      
+      // 새로운 멤버십 추가
+      for (final member in teamData.members) {
+        final memberExists = currentMembers.any((m) => m.teamId == member.teamId && m.userId == member.userId);
+        if (!memberExists) {
+          ref.read(teamMembersProvider.notifier).addMember(member);
+        }
+      }
+      
+      // 사용자 정보 동기화
+      for (final user in teamData.users) {
+        final currentUsers = ref.read(usersProvider);
+        final userExists = currentUsers.any((u) => u.id == user.id);
+        if (!userExists) {
+          ref.read(usersProvider.notifier).addUser(user);
+        } else {
+          ref.read(usersProvider.notifier).updateUser(user);
+        }
+      }
+      
+      print('팀 목록 새로고침 완료: 팀 ${teamData.teams.length}개, 멤버십 ${teamData.members.length}개, 사용자 ${teamData.users.length}명');
+    } catch (e) {
+      print('팀 목록 새로고침 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('새로고침 실패: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final teams = ref.watch(teamsProvider);
     final currentUser = ref.watch(currentUserProvider);
 
@@ -35,24 +105,27 @@ class TeamManagementScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: userTeams.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: userTeams.length,
-              itemBuilder: (context, index) {
-                final team = userTeams[index];
-                final membership = ref.watch(teamMembersProvider)
-                    .where((member) => member.teamId == team.id && member.userId == currentUser.id)
-                    .firstOrNull;
+      body: RefreshIndicator(
+        onRefresh: () => _refreshTeamData(),
+        child: userTeams.isEmpty
+            ? _buildEmptyState(context)
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: userTeams.length,
+                itemBuilder: (context, index) {
+                  final team = userTeams[index];
+                  final membership = ref.watch(teamMembersProvider)
+                      .where((member) => member.teamId == team.id && member.userId == currentUser.id)
+                      .firstOrNull;
 
-                return TeamCard(
-                  team: team,
-                  membership: membership,
-                  onTap: () => _navigateToTeamDetail(context, team),
-                );
-              },
-            ),
+                  return TeamCard(
+                    team: team,
+                    membership: membership,
+                    onTap: () => _navigateToTeamDetail(context, team),
+                  );
+                },
+              ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _navigateToCreateTeam(context),
         icon: const Icon(Icons.group_add),
@@ -62,41 +135,56 @@ class TeamManagementScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.groups,
-            size: 80,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            '아직 속한 팀이 없습니다',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.groups,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                 ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '새 팀을 만들거나 기존 팀에 참여해보세요',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                const SizedBox(height: 24),
+                Text(
+                  '아직 속한 팀이 없습니다',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
                 ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('첫 번째 팀 만들기'),
-            onPressed: () => _navigateToCreateTeam(context),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                const SizedBox(height: 12),
+                Text(
+                  '새 팀을 만들거나 기존 팀에 참여해보세요',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '아래로 당겨서 새로고침',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('첫 번째 팀 만들기'),
+                  onPressed: () => _navigateToCreateTeam(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

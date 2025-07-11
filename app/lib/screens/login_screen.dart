@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
+import '../services/team_service.dart';
 import '../providers/calendar_providers.dart';
 import 'calendar_screen.dart';
 
@@ -15,6 +16,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   
   bool _isLogin = true;
@@ -24,6 +26,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _nameController.dispose();
     super.dispose();
   }
@@ -56,6 +59,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // 현재 사용자 정보를 상태에 저장
       ref.read(currentUserProvider.notifier).state = response.user;
 
+      // 사용자의 팀 데이터 동기화
+      await _syncUserTeamData(response.user.id);
+
       // 성공 시 메인 화면으로 이동
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -80,6 +86,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _syncUserTeamData(String userId) async {
+    try {
+      // 서버에서 사용자의 팀 데이터 가져오기
+      final teamData = await TeamService.getUserTeamData(userId);
+      
+      // 로컬 상태 업데이트: 기존 로컬 데이터는 유지하고 서버 데이터 추가
+      for (final team in teamData.teams) {
+        final currentTeams = ref.read(teamsProvider);
+        final teamExists = currentTeams.any((t) => t.id == team.id);
+        if (!teamExists) {
+          ref.read(teamsProvider.notifier).addTeam(team);
+        } else {
+          ref.read(teamsProvider.notifier).updateTeam(team);
+        }
+      }
+      
+      // 멤버십 데이터 동기화
+      for (final member in teamData.members) {
+        final currentMembers = ref.read(teamMembersProvider);
+        final memberExists = currentMembers.any((m) => m.teamId == member.teamId && m.userId == member.userId);
+        if (!memberExists) {
+          ref.read(teamMembersProvider.notifier).addMember(member);
+        }
+      }
+      
+      // 사용자 정보 동기화
+      for (final user in teamData.users) {
+        final currentUsers = ref.read(usersProvider);
+        final userExists = currentUsers.any((u) => u.id == user.id);
+        if (!userExists) {
+          ref.read(usersProvider.notifier).addUser(user);
+        } else {
+          ref.read(usersProvider.notifier).updateUser(user);
+        }
+      }
+      
+      print('로그인 후 팀 데이터 동기화 완료: 팀 ${teamData.teams.length}개, 멤버십 ${teamData.members.length}개, 사용자 ${teamData.users.length}명');
+    } catch (e) {
+      print('팀 데이터 동기화 실패: $e');
+      // 동기화 실패해도 로그인은 성공으로 처리
     }
   }
 
@@ -187,7 +236,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // 회원가입 시에만 비밀번호 확인 필드 표시
+                  if (!_isLogin) ...[
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: '비밀번호 확인',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '비밀번호 확인을 입력해주세요';
+                        }
+                        if (value != _passwordController.text) {
+                          return '비밀번호가 일치하지 않습니다';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  const SizedBox(height: 8),
 
                   // 로그인/회원가입 버튼
                   SizedBox(
@@ -225,6 +301,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         _nameController.clear();
                         _emailController.clear();
                         _passwordController.clear();
+                        _confirmPasswordController.clear();
                       });
                     },
                     child: Text(

@@ -121,6 +121,29 @@ final sampleTeamsProvider = Provider<List<Team>>((ref) {
       color: Colors.green,
       ownerId: 'user3',
     ),
+    // 서버의 테스트 팀 추가
+    Team(
+      id: 'cmcyvq77b0000cnau5vvxfkgk',
+      name: '테스트 팀',
+      description: '팀 초대 기능을 테스트하기 위한 팀입니다',
+      color: const Color(0xFF3b82f6),
+      ownerId: 'cmcyvh4si0000cnsc4kuvyxsp',
+    ),
+    // 김민수가 생성한 팀들 추가
+    Team(
+      id: 'cmcywk66k000acnoqjio68mt2',
+      name: '스터디',
+      description: '스터디입니다',
+      color: const Color(0xFF2196f3),
+      ownerId: 'cmcyvhuky0001cnsc6e9xcrbv',
+    ),
+    Team(
+      id: 'cmcywksbc0000cn9mhi8luugl',
+      name: 'ㅁㄴㅇㄹ',
+      description: 'ㅁㄴㅇㄹ',
+      color: const Color(0xFF000000),
+      ownerId: 'cmcyvhuky0001cnsc6e9xcrbv',
+    ),
   ];
 });
 

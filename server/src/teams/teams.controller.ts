@@ -9,9 +9,12 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { TeamsService } from './teams.service';
 import { Prisma, TeamRole } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 interface AddMemberDto {
   userId: string;
@@ -23,12 +26,19 @@ interface UpdateMemberRoleDto {
 }
 
 @Controller('teams')
+@UseGuards(JwtAuthGuard)
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Post()
-  async create(@Body() createTeamDto: Prisma.TeamCreateInput) {
-    return this.teamsService.create(createTeamDto);
+  async create(@Body() createTeamDto: Omit<Prisma.TeamCreateInput, 'owner'>, @Request() req: any) {
+    const teamData: Prisma.TeamCreateInput = {
+      ...createTeamDto,
+      owner: {
+        connect: { id: req.user.id }
+      }
+    };
+    return this.teamsService.create(teamData);
   }
 
   @Get()
